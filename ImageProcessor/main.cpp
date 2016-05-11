@@ -556,6 +556,79 @@ void blur()
 }
 
 
+int processHighlights()
+{
+int RGBr, RGBg, RGBb = 0;
+int Hr, Hg, Hb = 0;
+int Gr, Gg, Gb = 0;
+const int ConstantV = 50;
+
+Uint32 newPixel;
+
+if(pixels ==NULL)
+{
+    pixels = (Uint32 *) formattedSurface->pixels;
+}
+
+for (int y = 0; y < formattedSurface->h; y++)
+{
+    for (int x = 0; x < formattedSurface->w; x++)
+    {
+
+        Uint8  red=0;
+        Uint8  green=0;
+        Uint8  blue=0;
+
+        SDL_GetRGB(pixels[y * formattedSurface->w + x], formattedSurface->format, &red, &green, &blue);
+
+
+
+        Hr = red - ConstantV;
+        Hg = green - ConstantV;
+        Hb = blue - ConstantV;
+
+        //clamp
+        if (Hr < 0){ Hr = 0; }
+        if (Hg < 0){ Hg = 0; }
+        if (Hb < 0){ Hb = 0; }
+
+        RGBr = Hr;
+        RGBg = Hg;
+        RGBb = Hb;
+
+        //add glare
+//        Gr = red + Hr;
+//        Gg = green + Hg;
+//        Gb = blue + Hb;
+
+        RGBr = red + RGBr;
+        RGBg = green + RGBg;
+        RGBb = blue + RGBb;
+
+
+        Gr=RGBr;
+        Gg=RGBg;
+        Gb=RGBb;
+
+
+        //clamp
+        if (Gr > 255){ Gr = 255; }
+        if (Gg > 255){ Gg = 255; }
+        if (Gb > 255){ Gb = 255; }
+
+        RGBr = Gr;
+        RGBg = Gg;
+        RGBb = Gb;
+
+
+        newPixel = SDL_MapRGB(image->format,RGBr,RGBg,RGBb);//maps the pixel values and then assigns to the variable
+        pixels[y * formattedSurface->w + x]=newPixel;
+}
+}
+}
+
+
+
 static float brightness=0;
 void brighten(Uint32 **pixels, int brightness)
 {
@@ -653,9 +726,20 @@ int main(int argc, char ** argv)
     window = SDL_CreateWindow("SDL2 Grayscale",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, 0);
     renderer = SDL_CreateRenderer(window, -1, 0);
-    image = IMG_Load("Chrome_icon.png");
+
+    //create a surface and load an image to it
+    image = IMG_Load("antipaxoi.png");
+
+    //create a properly formated surface (with the right pixel format) based on the image surface created before
     formattedSurface = SDL_ConvertSurfaceFormat( image, SDL_PIXELFORMAT_ARGB8888, NULL );
+
+    //create the texture based on a formated surface
     texture = SDL_CreateTextureFromSurface(renderer, formattedSurface);
+
+    std::cout<<"Sharpen-'s', Blur-'b'"<<std::endl;
+    std::cout<<"Brighten-'r', Darken-'d'"<<std::endl;
+    std::cout<<"Contrast-'c', Un-Contrast-'u'"<<std::endl;
+    std::cout<<"Restore Origina Image-'1'"<<std::endl;
 
 
     while (!quit)
@@ -669,10 +753,10 @@ int main(int argc, char ** argv)
             break;
         case SDL_KEYDOWN:
 
-
+            //allocate a pixels' buffer , if not already created
             if(pixels ==NULL)
             {
-                //create an array of pixels to manipulate, a backbuffer array of pixels to updat the pixels array from , and a saved orinal state of the pixels array
+                //create an array of pixels to manipulate, a backbuffer array of pixels to update the pixels array from , and a saved orinal state of the pixels array
                 pixels = (Uint32 *) formattedSurface->pixels;
 
                 //save the original image as an array of pixels before any sort of image processing
@@ -682,12 +766,18 @@ int main(int argc, char ** argv)
                     memcpy(originalImagepixels, pixels, 640*480 * sizeof(Uint32));
                 }
 
-
+                //NOT CURRENTLY USED
                 if(backbufferpixels ==NULL)
                 {
                     backbufferpixels = new Uint32[640*480];
                 }
+                //NOT CURRENTLY USED
 
+            }
+
+            if(event.key.keysym.sym==SDLK_ESCAPE)
+            {
+                quit = true;
             }
 
             if(event.key.keysym.sym==SDLK_s)
@@ -758,6 +848,14 @@ int main(int argc, char ** argv)
                 break;
             }
 
+
+            if(event.key.keysym.sym==SDLK_h)
+            {
+                //allow the user blur frames by parameters given on the command-line
+                processHighlights();
+                break;
+            }
+
 //            if(event.key.keysym.sym==SDLK_g)
 //            {
 //                //allow users to change the brightness
@@ -765,6 +863,7 @@ int main(int argc, char ** argv)
 //                break;
 //            }
 
+            //load
             if(event.key.keysym.sym==SDLK_1)
             {
                 memcpy(pixels, originalImagepixels, 640*480*sizeof(Uint32));
@@ -783,9 +882,12 @@ int main(int argc, char ** argv)
             }
         }
 
+        // Update the given texture rectangle with new updated pixel data.
         SDL_UpdateTexture(texture, NULL, pixels, 640 * sizeof(Uint32));
 
+        //texture/or portion of it it to the rendering context-target
         SDL_RenderCopy(renderer, texture, NULL, NULL);
+        //Update the screen with rendering performed.
         SDL_RenderPresent(renderer);
     }
 
@@ -801,3 +903,125 @@ int main(int argc, char ** argv)
 
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//#include <stdlib.h>
+//#include <stdio.h>
+//#include <SDL2/SDL.h>
+//#include <SDL2/SDL_image.h>
+//#include <math.h>
+
+//int convertNumbers(Uint8);
+
+//int main(int argc, char **argv)
+//{
+//    //Load both images as a surface
+//    SDL_Surface * target = IMG_Load("foo1.png");
+//    SDL_Surface * source = IMG_Load("foo.png");
+
+//    int y=0, x=0;
+//    Uint8 targetR, targetG, targetB, sourceR, sourceG, sourceB;
+
+//    target = SDL_ConvertSurfaceFormat(target, SDL_PIXELFORMAT_ARGB8888, 0);
+//    source = SDL_ConvertSurfaceFormat(source, SDL_PIXELFORMAT_ARGB8888, 0);
+
+//    Uint32 *targetpixels = (Uint32 *)target->pixels;
+//    Uint32 *sourcepixels = (Uint32 *)source->pixels;
+
+//    Uint32 targetpixel = targetpixels[y * target-> w + x];
+//    Uint32 sourcepixel = sourcepixels[y * source-> w + x];
+
+//    //Get RGB values of the source image and the target image
+//    SDL_GetRGB(targetpixels[x+y*target->w],target->format,&targetR,&targetG,&targetB);
+//    SDL_GetRGB(sourcepixels[x+y*source->w],source->format,&sourceR,&sourceG,&sourceB);
+
+//    printf("%hhu\n", targetR);
+
+////    if (targetR!=0)
+//    {
+//        printf("%hhu\n", targetR);
+//    }
+
+//    //Convert the RGB values to doubles and make them in the range of 0-1
+//    double convertTargetR = convertNumbers(targetR);
+//    double convertTargetG = convertNumbers(targetG);
+//    double convertTargetB = convertNumbers(targetB);
+//    double convertSourceR = convertNumbers(sourceR);
+//    double convertSourceG = convertNumbers(sourceG);
+//    double convertSourceB = convertNumbers(sourceB);
+
+//    //Print out new values
+//    printf("New targetR value: %f\n", convertTargetR);
+//    printf("New targetG value: %f\n", convertTargetG);
+//    printf("New targetB value: %f\n", convertTargetB);
+//    printf("New sourceR value: %f\n", convertSourceR);
+//    printf("New sourceG value: %f\n", convertSourceG);
+//    printf("New sourceB value: %f\n", convertSourceB);
+
+//    float matA[3][3] = {
+//        {0.3811, 0.5783, 0.0402},
+//        {0.1967, 0.7244, 0.0782},
+//        {0.0241, 0.1288, 0.8444}
+//    };
+
+//    float matB[3][3] = {
+//        {(1/(sqrt(3))),0,0},
+//        {0,(1/(sqrt(6))),0},
+//        {0,0,(1/(sqrt(2)))}
+//    };
+
+//    float matC[3][3] = {
+//        {1,1,1},
+//        {1,1,-2},
+//        {1,-1,0}
+//    };
+
+//    float matD[3][3] = {
+//        {1,1,1},
+//        {1,1,-1},
+//        {1,-2,0}
+//    };
+
+//    float matE[3][3] = {
+//        {((sqrt(3))/3),0,0},
+//        {0,((sqrt(6))/6),0},
+//        {0,0,((sqrt(2))/2)}
+//    };
+
+//    float matF[3][3] = {
+//        {4.4679,-3.5873,0.1193},
+//        {-1.2186,2.3809,-0.1624},
+//        {0.0497,-0.2439,1.2045}
+//    };
+
+//    return 0;
+//}
+
+//int convertNumbers(Uint8 pixelColour){
+//    double newpixelColour = pixelColour/255.0;
+//    printf("Converted pixel colour: %f\n", newpixelColour);
+//    return newpixelColour;
+//}

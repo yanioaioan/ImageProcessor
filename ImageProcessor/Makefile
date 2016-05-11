@@ -619,7 +619,8 @@ main.o: main.cpp include/SDL.h \
 		include/SDL_render.h \
 		include/SDL_system.h \
 		include/SDL_timer.h \
-		include/SDL_version.h
+		include/SDL_version.h \
+		include/SDL_image.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o main.cpp
 
 ####### Install
