@@ -404,7 +404,8 @@ Uint32 * backbufferpixels;
 Uint32 * originalImagepixels;
 
 
-void sharpen()
+float sharpenCoefficient=1;
+void sharpen(Uint32 ** pixels, float sharpenCoefficient)
 {
     //Filter matrix 3x3
     float sharpMat[3][3]={{-1,-2,-1},{-2,19,-2},{-1,-2,-1}};
@@ -412,11 +413,6 @@ void sharpen()
         for (int ii=0; ii <3 ; ++ii)
             sharpMat[jj][ii]*=(float)1/7;
 
-
-    if(pixels ==NULL)
-    {
-        pixels = (Uint32 *) formattedSurface->pixels;
-    }
 
     for (int y = 0; y < formattedSurface->h; y++)
     {
@@ -442,10 +438,10 @@ void sharpen()
                         //multiply with 9
                         if(i==0 && j==0)
                         {
-                            SDL_GetRGB(pixels[tmpIndex], formattedSurface->format, &red, &green, &blue);
-                            float r=(float)red*sharpMat[i+1][j+1];
-                            float g=(float)green*sharpMat[i+1][j+1];
-                            float b=(float)blue*sharpMat[i+1][j+1];
+                            SDL_GetRGB((*pixels)[tmpIndex], formattedSurface->format, &red, &green, &blue);
+                            float r=(float)red*sharpenCoefficient*sharpMat[i+1][j+1];
+                            float g=(float)green*sharpenCoefficient*sharpMat[i+1][j+1];
+                            float b=(float)blue*sharpenCoefficient*sharpMat[i+1][j+1];
 
                             sumR+=r;
                             sumG+=g;
@@ -453,7 +449,7 @@ void sharpen()
                         }
                         else if (abs(i)==abs(j) && i!=0) //but not the central element
                         {
-                            SDL_GetRGB(pixels[tmpIndex], formattedSurface->format, &red, &green, &blue);
+                            SDL_GetRGB((*pixels)[tmpIndex], formattedSurface->format, &red, &green, &blue);
                             float r=(float)red*sharpMat[i+1][j+1];
                             float g=(float)green*sharpMat[i+1][j+1];
                             float b=(float)blue*sharpMat[i+1][j+1];
@@ -464,7 +460,7 @@ void sharpen()
                         }
                         else
                         {
-                            SDL_GetRGB(pixels[tmpIndex], formattedSurface->format, &red, &green, &blue);
+                            SDL_GetRGB((*pixels)[tmpIndex], formattedSurface->format, &red, &green, &blue);
                             float r=(float)red*sharpMat[i+1][j+1];
                             float g=(float)green*sharpMat[i+1][j+1];
                             float b=(float)blue*sharpMat[i+1][j+1];
@@ -486,7 +482,7 @@ void sharpen()
                 c.g=sumG;
                 c.b=sumB;
                 Uint32 tmpPixel=SDL_MapRGB(formattedSurface->format, c.r, c.g, c.b);
-                pixels[ y * formattedSurface->w + x] = tmpPixel;
+                (*pixels)[ y * formattedSurface->w + x] = tmpPixel;
 
             }
         }
@@ -495,15 +491,12 @@ void sharpen()
 }
 
 
-void blur()
+void blur(Uint32 ** pixels)
 {
     //Filter matrix 3x3
     float blurMat[3][3]={{1.0/9,1.0/9,1.0/9},{1.0/9,1.0/9,1.0/9},{1.0/9,1.0/9,1.0/9}};
 
-    if(pixels ==NULL)
-    {
-        pixels = (Uint32 *) formattedSurface->pixels;
-    }
+
 
     for (int y = 0; y < formattedSurface->h; y++)
     {
@@ -528,7 +521,7 @@ void blur()
                         Uint8  green=0;
                         Uint8  blue=0;
 
-                        SDL_GetRGB(pixels[tmpIndex], formattedSurface->format, &red, &green, &blue);
+                        SDL_GetRGB((*pixels)[tmpIndex], formattedSurface->format, &red, &green, &blue);
                         float r=(float)red*blurMat[i+1][j+1];
                         float g=(float)green*blurMat[i+1][j+1];
                         float b=(float)blue*blurMat[i+1][j+1];
@@ -548,7 +541,7 @@ void blur()
                 c.g=sumG;
                 c.b=sumB;
                 Uint32 tmpPixel=SDL_MapRGB(formattedSurface->format, c.r, c.g, c.b);
-                pixels[ y * formattedSurface->w + x] = tmpPixel;
+                (*pixels)[ y * formattedSurface->w + x] = tmpPixel;
 
             }
         }
@@ -556,7 +549,7 @@ void blur()
 }
 
 
-int processHighlights()
+void processHighlights(Uint32 **pixels)
 {
 int RGBr, RGBg, RGBb = 0;
 int Hr, Hg, Hb = 0;
@@ -565,10 +558,6 @@ const int ConstantV = 50;
 
 Uint32 newPixel;
 
-if(pixels ==NULL)
-{
-    pixels = (Uint32 *) formattedSurface->pixels;
-}
 
 for (int y = 0; y < formattedSurface->h; y++)
 {
@@ -579,7 +568,7 @@ for (int y = 0; y < formattedSurface->h; y++)
         Uint8  green=0;
         Uint8  blue=0;
 
-        SDL_GetRGB(pixels[y * formattedSurface->w + x], formattedSurface->format, &red, &green, &blue);
+        SDL_GetRGB((*pixels)[y * formattedSurface->w + x], formattedSurface->format, &red, &green, &blue);
 
 
 
@@ -622,7 +611,7 @@ for (int y = 0; y < formattedSurface->h; y++)
 
 
         newPixel = SDL_MapRGB(image->format,RGBr,RGBg,RGBb);//maps the pixel values and then assigns to the variable
-        pixels[y * formattedSurface->w + x]=newPixel;
+        (*pixels)[y * formattedSurface->w + x]=newPixel;
 }
 }
 }
@@ -728,9 +717,12 @@ int main(int argc, char ** argv)
     renderer = SDL_CreateRenderer(window, -1, 0);
 
     //create a surface and load an image to it
-    image = IMG_Load("antipaxoi.png");
 
     //create a properly formated surface (with the right pixel format) based on the image surface created before
+    image = IMG_Load("Chrome_icon.png");/**/
+
+    if (image==NULL)
+        printf("Oh My Goodness, an error : %s\n", IMG_GetError());
     formattedSurface = SDL_ConvertSurfaceFormat( image, SDL_PIXELFORMAT_ARGB8888, NULL );
 
     //create the texture based on a formated surface
@@ -770,6 +762,7 @@ int main(int argc, char ** argv)
                 if(backbufferpixels ==NULL)
                 {
                     backbufferpixels = new Uint32[640*480];
+                    memcpy(backbufferpixels, pixels, 640*480*sizeof(Uint32));
                 }
                 //NOT CURRENTLY USED
 
@@ -782,8 +775,9 @@ int main(int argc, char ** argv)
 
             if(event.key.keysym.sym==SDLK_s)
             {
+//                memcpy(backbufferpixels, pixels, 640*480*sizeof(Uint32));
                 //allow the user sharpen frames by parameters given on the command-line
-                sharpen();
+                sharpen(&backbufferpixels, sharpenCoefficient/*+=0.01*/);
 
 
 //SET ALL PIXELS TO RED
@@ -791,21 +785,28 @@ int main(int argc, char ** argv)
 //                {
 //                    for (int x = 0; x < formattedSurface->w; x++)
 //                    {
+
+//                       //get pixel color
+
+//                        Uint8 red, green, blue;
 //                        Uint32 pixel = pixels[y * formattedSurface->w + x];
 
 ////                        SDL_GetRGB(pixel, formattedSurface->format, &red, &green, &blue);
 ////                        //std::cout<<"red="<<(int)red<<std::endl;
 
+
+//                       //set pixel color
 //                        SDL_Color c;
 //                        c.r=255;
 //                        c.g=0;
 //                        c.b=0;
 //                        //create a
 //                        Uint32 tmpPixel=SDL_MapRGB(formattedSurface->format, c.r,c.g,c.b);
-//                        pixel = tmpPixel;
-
+//
+//                            all the same
+////                        pixel = tmpPixel;
 ////                        pixel = (0xFF << 24) | (red << 16) | (green << 8) | blue;
-//                        pixels[y * formattedSurface->w + x] = pixel;
+////                        pixels[y * formattedSurface->w + x] = pixel;
 
 
 
@@ -817,42 +818,49 @@ int main(int argc, char ** argv)
 
             if(event.key.keysym.sym==SDLK_b)
             {
+//                memcpy(backbufferpixels, pixels, 640*480*sizeof(Uint32));
                 //allow the user blur frames by parameters given on the command-line
-                blur();
+                blur(&backbufferpixels);
                 break;
             }
 
             if(event.key.keysym.sym==SDLK_r)
             {
+                memcpy(backbufferpixels, pixels, 640*480*sizeof(Uint32));
                 //allow users to change the brightness
-                brighten(&pixels,1);
+                brighten(&backbufferpixels,brightness++);
                 break;
             }
             if(event.key.keysym.sym==SDLK_d)
             {
+                memcpy(backbufferpixels, pixels, 640*480*sizeof(Uint32));
                 //allow users to change the brightness
-                brighten(&pixels,-1);
+                brighten(&backbufferpixels,brightness--);
                 break;
             }
 
             if(event.key.keysym.sym==SDLK_c)
             {
+                memcpy(backbufferpixels, pixels, 640*480*sizeof(Uint32));
                 //allow users to change the brightness
-                contrast(&pixels,contrastFactor++);
+                contrast(&backbufferpixels,contrastFactor++);
                 break;
             }
             if(event.key.keysym.sym==SDLK_u)
             {
+                memcpy(backbufferpixels, pixels, 640*480*sizeof(Uint32));
                 //allow users to change the brightness
-                contrast(&pixels,contrastFactor--);
+                contrast(&backbufferpixels,contrastFactor--);
                 break;
             }
 
 
             if(event.key.keysym.sym==SDLK_h)
             {
-                //allow the user blur frames by parameters given on the command-line
-                processHighlights();
+                memcpy(backbufferpixels, pixels, 640*480*sizeof(Uint32));
+                //allow users to find highlights and add glare
+                processHighlights(&backbufferpixels);
+
                 break;
             }
 
@@ -867,9 +875,14 @@ int main(int argc, char ** argv)
             if(event.key.keysym.sym==SDLK_1)
             {
                 memcpy(pixels, originalImagepixels, 640*480*sizeof(Uint32));
+                memcpy(backbufferpixels, pixels, 640*480*sizeof(Uint32));
                 break;
             }
 
+            if (event.key.keysym.sym==SDLK_ESCAPE)
+            {
+               quit = true;
+            }
 
         case SDL_KEYUP:
             if(event.key.keysym.sym==SDLK_r)
@@ -883,7 +896,10 @@ int main(int argc, char ** argv)
         }
 
         // Update the given texture rectangle with new updated pixel data.
-        SDL_UpdateTexture(texture, NULL, pixels, 640 * sizeof(Uint32));
+        SDL_UpdateTexture(texture, NULL, backbufferpixels, 640 * sizeof(Uint32));
+
+        //save out result
+//        SDL_UpdateTexture(texture, NULL, pixels, 640 * sizeof(Uint32));
 
         //texture/or portion of it it to the rendering context-target
         SDL_RenderCopy(renderer, texture, NULL, NULL);
