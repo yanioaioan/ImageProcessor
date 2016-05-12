@@ -390,6 +390,8 @@
 #include <cstdlib>
 #include <string.h>
 
+#include <math.h>
+
 bool quit = false;
 SDL_Event event;
 
@@ -397,12 +399,34 @@ SDL_Window * window;
 SDL_Renderer * renderer;
 SDL_Surface * image;
 SDL_Surface * formattedSurface;
+
+
 SDL_Texture * texture;
 
 Uint32 * pixels;
 Uint32 * backbufferpixels;
 Uint32 * originalImagepixels;
 
+SDL_Surface * imageSRCCOLORGRADE;
+SDL_Surface * formattedSurfaceSRC;
+SDL_Texture * texture2;
+
+typedef struct XYZ
+{
+    double x,y,z;
+}XYZ;
+
+XYZ xyz;
+
+
+typedef struct Lab
+{
+    double L,a,b;
+}Lab;
+
+Lab lab;
+
+Uint32 * srcImagePixels;
 
 float sharpenCoefficient=1;
 void sharpen(Uint32 ** pixels, float sharpenCoefficient)
@@ -702,13 +726,354 @@ void contrast(Uint32 **pixels, float contrastFactor)
         }
     }
 
+}
 
+
+
+
+/// <summary>
+/// XYZ to L*a*b* transformation function.
+/// </summary>
+double Fxyz(double t)
+{
+    return ((t > 0.008856)? pow(t, (1.0/3.0)) : (7.787*t + 16.0/116.0));
+}
+
+/// <summary>
+/// Converts CIEXYZ to CIELab.
+/// </summary>
+void XYZtoLab(XYZ *XYZpixel, Lab *Labpixel, double x, double y, double z)
+{
+    double CIEXYZ [] = {0.9505, 1.0, 1.0890};
+
+    double L = 116.0 * Fxyz( y/CIEXYZ[1] ) -16;
+    double A = 500.0 * (Fxyz( x/CIEXYZ[0] ) - Fxyz( y/CIEXYZ[1] ) );
+    double B = 200.0 * (Fxyz( y/CIEXYZ[1] ) - Fxyz( z/CIEXYZ[2]) );
+
+
+    lab.L=L;
+    lab.a=A;
+    lab.b=B;
+    (*Labpixel) = lab;
+}
+
+
+void CIEXYZ( double x, double y, double z)
+{
+//    x = (x>0.9505)? 0.9505 : ((x<0)? 0 : x);
+//    y = (y>1.0)? 1.0 : ((y<0)? 0 : y);
+//    z = (z>1.089)? 1.089 : ((z<0)? 0 : z);
+
+    xyz.x=x;
+    xyz.y=y;
+    xyz.z=z;
 
 }
+
+ void RGBtoXYZ(Uint8 red, Uint8 green, Uint8 blue)
+{
+    // normalize red, green, blue values
+    double rLinear = (double)red/255.0;
+    double gLinear = (double)green/255.0;
+    double bLinear = (double)blue/255.0;
+
+    // convert to a sRGB form
+    double r = (rLinear > 0.04045)? pow((rLinear + 0.055)/(1 + 0.055), 2.2) : (rLinear/12.92) ;
+    double g = (gLinear > 0.04045)? pow((gLinear + 0.055)/(1 + 0.055), 2.2) : (gLinear/12.92) ;
+    double b = (bLinear > 0.04045)? pow((bLinear + 0.055)/(1 + 0.055), 2.2) : (bLinear/12.92) ;
+
+    r *=100; g *=100; b *=100;
+
+    // converts CIE to XYZ
+    CIEXYZ(
+        (r*0.4124 + g*0.3576 + b*0.1805),
+        (r*0.2126 + g*0.7152 + b*0.0722),
+        (r*0.0193 + g*0.1192 + b*0.9505)
+        );
+}
+
+
+
+/// <summary>
+/// Converts CIEXYZ to RGB structure.
+/// </summary>
+void  XYZtoRGB(Uint32 *destpixel,double x, double y, double z)
+{
+ double Clinear [3];
+ Clinear[0] = x*3.2410 - y*1.5374 - z*0.4986; // red
+ Clinear[1] = -x*0.9692 + y*1.8760 - z*0.0416; // green
+ Clinear[2] = x*0.0556 - y*0.2040 + z*1.0570; // blue
+
+ for(int i=0; i<3; i++)
+ {
+     Clinear[i] = (Clinear[i]<=0.0031308)? 12.92*Clinear[i] : (1+0.055)* pow(Clinear[i], (1.0/2.4)) - 0.055;
+ }
+
+
+ double t1=Clinear[0]*255.0;
+ double t2=Clinear[1]*255.0;
+ double t3=Clinear[2]*255.0;
+
+ t1 = t1 > 255 ? 255 : t1; t2 = t2 > 255 ? 255 : t2; t3 = t3 > 255 ? 255 : t3;
+ t1 = t1 < 0 ? 0 : t1; t2 = t2 < 0 ? 0 : t2; t3 = t3 < 0 ? 0 : t3;
+
+
+ Uint32 tmppixel = SDL_MapRGB(formattedSurface->format, t1, t2, t3);
+ (*destpixel)=tmppixel;
+
+// RGB(
+//     Convert.ToInt32( Double.Parse(String.Format("{0:0.00}",
+//         Clinear[0]*255.0)) ),
+//     Convert.ToInt32( Double.Parse(String.Format("{0:0.00}",
+//         Clinear[1]*255.0)) ),
+//     Convert.ToInt32( Double.Parse(String.Format("{0:0.00}",
+//         Clinear[2]*255.0)) )
+//     );
+}
+
+
+/// <summary>
+/// Converts CIELab to CIEXYZ.
+/// </summary>
+void LabtoXYZ(double l, double a, double b)
+{
+ double delta = 6.0/29.0;
+
+ double fy = (l+16)/116.0;
+ double fx = fy + (a/500.0);
+ double fz = fy - (b/200.0);
+
+ double ciexyz [] = {0.9505, 1.0, 1.0890};
+
+
+ CIEXYZ(
+     (fx > delta)? ciexyz[0] * (fx*fx*fx) : (fx - 16.0/116.0)*3*( delta*delta)*ciexyz[0],
+     (fy > delta)? ciexyz[1] * (fy*fy*fy) : (fy - 16.0/116.0)*3*( delta*delta)*ciexyz[1],
+     (fz > delta)? ciexyz[2] * (fz*fz*fz) : (fz - 16.0/116.0)*3*( delta*delta)*ciexyz[2]
+     );
+}
+
+
+
+void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **convertedPixel*/)
+{
+    // Convert src to Lab color space
+    XYZ * xyzArraySRC= new XYZ[ formattedSurfaceSRC->w*formattedSurfaceSRC->h];
+    Lab *LabArraySRC = new Lab[ formattedSurfaceSRC->w*formattedSurfaceSRC->h];
+
+    for (int y = 0; y < formattedSurfaceSRC->h; y++)
+    {
+        for (int x = 0; x < formattedSurfaceSRC->w; x++)
+        {
+            int tmpIndex = y * formattedSurfaceSRC->w + x;
+
+            Uint8  red=0;
+            Uint8  green=0;
+            Uint8  blue=0;
+
+            SDL_GetRGB( (*srcpixels)[tmpIndex], formattedSurfaceSRC->format, &red, &green, &blue);
+
+
+            RGBtoXYZ(red, green, blue);//modify xyz
+            xyzArraySRC[tmpIndex]= xyz; //assign it
+
+//            printf("xyzArraySRC[%d]= %d, %d, %d, \n", tmpIndex, xyzArraySRC[tmpIndex].x ,xyzArraySRC[tmpIndex].y, xyzArraySRC[tmpIndex].z);
+
+            Uint8  X=0;
+            Uint8  Y=0;
+            Uint8  Z=0;
+            SDL_GetRGB(  (*srcpixels)[tmpIndex], formattedSurfaceSRC->format, &X, &Y, &Z);
+
+            XYZtoLab( &(xyzArraySRC[tmpIndex]), &(LabArraySRC[tmpIndex]), X,Y,Z );
+        }
+    }
+
+    // Convert dest to Lab color space
+    XYZ * xyzArrayDest= new XYZ[ formattedSurface->w*formattedSurface->h];
+    Lab *LabArrayDest = new Lab[ formattedSurface->w*formattedSurface->h];
+
+    for (int y = 0; y < formattedSurface->h; y++)
+    {
+        for (int x = 0; x < formattedSurface->w; x++)
+        {
+            int tmpIndex = y * formattedSurface->w + x;
+
+            Uint8  red=0;
+            Uint8  green=0;
+            Uint8  blue=0;
+
+            SDL_GetRGB( (*dstpixels)[tmpIndex], formattedSurface->format, &red, &green, &blue);
+
+
+            RGBtoXYZ(red, green, blue);//modify xyz
+            xyzArrayDest[tmpIndex]= xyz; //assign it
+
+            Uint8  X=0;
+            Uint8  Y=0;
+            Uint8  Z=0;
+            SDL_GetRGB(  (*dstpixels)[tmpIndex], formattedSurfaceSRC->format, &X, &Y, &Z);
+
+            XYZtoLab( &(xyzArrayDest[tmpIndex]), &(LabArrayDest[tmpIndex]), X,Y,Z );
+        }
+    }
+
+
+    // compute mean of L, a, b  of src and dest image
+    double totalLsrc, totalAsrc, totalBsrc;
+    double totalLdest, totalAdest, totalBdest;
+
+
+    for (int y = 0; y < formattedSurface->h; y++)
+    {
+        for (int x = 0; x < formattedSurface->w; x++)
+        {
+            int i = y * formattedSurface->w + x;
+
+            totalLsrc+=LabArraySRC[i].L;  totalAsrc+=LabArraySRC[i].a;  totalBsrc+=LabArraySRC[i].b;
+            totalLdest+=LabArrayDest[i].L;  totalAdest+=LabArrayDest[i].a;  totalBdest+=LabArrayDest[i].b;
+        }
+    }
+
+    double meanLsrc = totalLsrc / formattedSurface->w*formattedSurface->h;
+    double meanAsrc = totalAsrc / formattedSurface->w*formattedSurface->h;
+    double meanBsrc = totalBsrc / formattedSurface->w*formattedSurface->h;
+    double meanLdest = totalLdest / formattedSurface->w*formattedSurface->h;
+    double meanAdest = totalAdest / formattedSurface->w*formattedSurface->h;
+    double meanBdest = totalBdest / formattedSurface->w*formattedSurface->h;
+
+    // compute standard deviation of L, a, b  of src and dest image (find variance and take sqrt of it)
+
+    double sumdiffLsrc=0; double sumdiffAsrc=0; double sumdiffBsrc=0;
+    double sumdiffLdest=0; double sumdiffAdest=0; double sumdiffBdest=0;
+
+    for (int y = 0; y < formattedSurface->h; y++)
+    {
+        for (int x = 0; x < formattedSurface->w; x++)
+        {
+            int i = y * formattedSurface->w + x;
+
+            sumdiffLsrc+= pow( (LabArraySRC[i].L - meanLsrc) , 2);
+            sumdiffAsrc+= pow( (LabArraySRC[i].a - meanAsrc) , 2);
+            sumdiffBsrc+= pow( (LabArraySRC[i].b - meanBsrc) , 2);
+
+            sumdiffLdest+= pow( (LabArrayDest[i].L - meanLdest) , 2);
+            sumdiffAdest+= pow( (LabArrayDest[i].a - meanAdest) , 2);
+            sumdiffBdest+= pow( (LabArrayDest[i].b - meanBdest) , 2);
+        }
+    }
+
+    double varLsrc = sumdiffLsrc / formattedSurface->w*formattedSurface->h;
+    double varAsrc = sumdiffAsrc / formattedSurface->w*formattedSurface->h;
+    double varBsrc = sumdiffBsrc / formattedSurface->w*formattedSurface->h;
+    double varLdest = sumdiffLdest / formattedSurface->w*formattedSurface->h;
+    double varAdest = sumdiffAdest / formattedSurface->w*formattedSurface->h;
+    double varBdest = sumdiffBdest / formattedSurface->w*formattedSurface->h;
+
+    // standar deviation
+    double sdevLsrc = sqrt(varLsrc);
+    double sdevAsrc = sqrt(varAsrc);
+    double sdevBsrc = sqrt(varBsrc);
+    double sdevLdest = sqrt(varLdest);
+    double sdevAdest = sqrt(varAdest);
+    double sdevBdest = sqrt(varBdest);
+
+    // subtract the means from the target image
+    for (int y = 0; y < formattedSurface->h; y++)
+    {
+        for (int x = 0; x < formattedSurface->w; x++)
+        {
+            int i = y * formattedSurface->w + x;
+            // subtract the means from the target image
+
+            LabArrayDest[i].L -= meanLdest;
+            LabArrayDest[i].a -= meanAdest;
+            LabArrayDest[i].b -= meanBdest;
+
+            // scale by the standard deviations
+
+            LabArrayDest[i].L = (sdevLdest/sdevLsrc)*LabArrayDest[i].L ;
+            LabArrayDest[i].a = (sdevAdest/sdevAsrc)*LabArrayDest[i].a ;
+            LabArrayDest[i].b = (sdevBdest/sdevBsrc)*LabArrayDest[i].b ;
+
+            LabArrayDest[i].L +=meanLsrc;
+            LabArrayDest[i].a +=meanAsrc;
+            LabArrayDest[i].b +=meanBsrc;
+
+
+            // clamp to 0-255
+            LabArrayDest[i].L = (LabArrayDest[i].L > 255) ? LabArrayDest[i].L = 255 : LabArrayDest[i].L;
+            LabArrayDest[i].L = (LabArrayDest[i].L < 0) ? LabArrayDest[i].L = 0 : LabArrayDest[i].L;
+
+            LabArrayDest[i].a = (LabArrayDest[i].a > 255) ? LabArrayDest[i].a = 255 : LabArrayDest[i].a;
+            LabArrayDest[i].a = (LabArrayDest[i].a < 0) ? LabArrayDest[i].a = 0 : LabArrayDest[i].a;
+
+            LabArrayDest[i].b = (LabArrayDest[i].b > 255) ? LabArrayDest[i].b = 255 : LabArrayDest[i].b;
+            LabArrayDest[i].b = (LabArrayDest[i].b < 0) ? LabArrayDest[i].b = 0 : LabArrayDest[i].b;
+
+            //convert back from Lab to RGB color space
+
+            LabtoXYZ(LabArrayDest[i].L, LabArrayDest[i].a, LabArrayDest[i].b);
+
+            XYZtoRGB( &(*dstpixels)[i] ,xyz.x, xyz.y, xyz.z);
+
+//            SDL_UpdateTexture(texture, NULL, backbufferpixels, 640 * sizeof(Uint32));
+//            SDL_RenderCopy(renderer, texture, NULL, NULL);
+//            SDL_RenderPresent(renderer);
+
+
+        }
+
+    }
+
+
+//    int maxPixelintensity=0;
+//    int minPixelintensity=255;
+//    for (int y = 0; y < formattedSurface->h; y++)
+//    {
+//        for (int x = 0; x < formattedSurface->w; x++)
+//        {
+//            int tmpIndex = y * formattedSurface->w + x;
+
+//            Uint8  red=0;
+//            Uint8  green=0;
+//            Uint8  blue=0;
+
+//            float factor = (259 * (contrastFactor + 255)) / (255 * (259 - contrastFactor));
+
+//            SDL_GetRGB((*pixels)[tmpIndex], formattedSurface->format, &red, &green, &blue);
+//            float r=(float)red;
+//            float g=(float)green;
+//            float b=(float)blue;
+
+//            float newRed   = clamp((factor * (r)   - 128) + 128);
+//            float newGreen = clamp((factor * (g)   - 128) + 128);
+//            float newBlue  = clamp((factor * (b)   - 128) + 128);
+
+//            SDL_Color c;
+//            c.r=newRed;
+//            c.g=newGreen;
+//            c.b=newBlue;
+//            Uint32 tmpPixel=SDL_MapRGB(formattedSurface->format, c.r, c.g, c.b);
+//            (*pixels)[ y * formattedSurface->w + x] = tmpPixel;
+
+
+//        }
+//    }
+
+
+
+    delete xyzArraySRC;
+    delete LabArraySRC;
+    delete xyzArrayDest;
+    delete LabArrayDest;
+}
+
+
 
 
 int main(int argc, char ** argv)
 {
+
     SDL_Init(SDL_INIT_VIDEO);
     IMG_Init(IMG_INIT_JPG);
 
@@ -719,20 +1084,32 @@ int main(int argc, char ** argv)
     //create a surface and load an image to it
 
     //create a properly formated surface (with the right pixel format) based on the image surface created before
-    image = IMG_Load("Chrome_icon.png");/**/
+    image = IMG_Load("antipaxoi.png");
+
+    imageSRCCOLORGRADE = IMG_Load("imageSRCCOLORGRADE.png");
+
 
     if (image==NULL)
         printf("Oh My Goodness, an error : %s\n", IMG_GetError());
     formattedSurface = SDL_ConvertSurfaceFormat( image, SDL_PIXELFORMAT_ARGB8888, NULL );
 
+    if (imageSRCCOLORGRADE==NULL)
+        printf("Oh My Goodness, an error : %s\n", IMG_GetError());
+    formattedSurfaceSRC = SDL_ConvertSurfaceFormat( imageSRCCOLORGRADE, SDL_PIXELFORMAT_ARGB8888, NULL );
+
     //create the texture based on a formated surface
     texture = SDL_CreateTextureFromSurface(renderer, formattedSurface);
+
+//    texture2 = SDL_CreateTextureFromSurface(renderer, formattedSurfaceSRC);
+
 
     std::cout<<"Sharpen-'s', Blur-'b'"<<std::endl;
     std::cout<<"Brighten-'r', Darken-'d'"<<std::endl;
     std::cout<<"Contrast-'c', Un-Contrast-'u'"<<std::endl;
     std::cout<<"Restore Origina Image-'1'"<<std::endl;
 
+    //allocate space for 1 pixel
+//    convertedPixel = new Uint32[1];
 
     while (!quit)
     {
@@ -767,6 +1144,15 @@ int main(int argc, char ** argv)
                 //NOT CURRENTLY USED
 
             }
+
+
+            if(srcImagePixels ==NULL)
+            {
+                srcImagePixels = (Uint32 *) formattedSurfaceSRC->pixels;
+//                memcpy(backbufferpixels, srcImagePixels, 640*480*sizeof(Uint32));
+            }
+
+
 
             if(event.key.keysym.sym==SDLK_ESCAPE)
             {
@@ -864,6 +1250,16 @@ int main(int argc, char ** argv)
                 break;
             }
 
+            if(event.key.keysym.sym==SDLK_t)
+            {
+                memcpy(backbufferpixels, pixels, 640*480*sizeof(Uint32));
+                //allow users to find highlights and add glare
+                colortransfer(&srcImagePixels, &backbufferpixels);
+
+                break;
+            }
+
+
 //            if(event.key.keysym.sym==SDLK_g)
 //            {
 //                //allow users to change the brightness
@@ -907,6 +1303,8 @@ int main(int argc, char ** argv)
         SDL_RenderPresent(renderer);
     }
 
+
+//    delete convertedPixel;
     SDL_DestroyTexture(texture);
     SDL_FreeSurface(formattedSurface);
     SDL_DestroyRenderer(renderer);
