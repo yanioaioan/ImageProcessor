@@ -389,6 +389,7 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <string.h>
+#include <stdio.h>
 
 #include <math.h>
 
@@ -742,18 +743,43 @@ double Fxyz(double t)
 /// <summary>
 /// Converts CIEXYZ to CIELab.
 /// </summary>
-void XYZtoLab(XYZ *XYZpixel, Lab *Labpixel, double x, double y, double z)
+void XYZtoLab(XYZ *XYZpixel, Lab *Labpixel, double X, double Y, double Z)
 {
     double CIEXYZ [] = {0.9505, 1.0, 1.0890};
 
-    double L = 116.0 * Fxyz( y/CIEXYZ[1] ) -16;
-    double A = 500.0 * (Fxyz( x/CIEXYZ[0] ) - Fxyz( y/CIEXYZ[1] ) );
-    double B = 200.0 * (Fxyz( y/CIEXYZ[1] ) - Fxyz( z/CIEXYZ[2]) );
+//    double L = 116.0 * Fxyz( y/CIEXYZ[1] ) -16;
+//    double A = 500.0 * (Fxyz( x/CIEXYZ[0] ) - Fxyz( y/CIEXYZ[1] ) );
+//    double B = 200.0 * (Fxyz( y/CIEXYZ[1] ) - Fxyz( z/CIEXYZ[2]) );
+
+    double ref_X=CIEXYZ[0];double ref_Y=CIEXYZ[1];double ref_Z=CIEXYZ[2];
+    double var_X = X / ref_X ;         //ref_X =  95.047   Observer= 2°, Illuminant= D65
+    double var_Y = Y / ref_Y ;         //ref_Y = 100.000
+    double var_Z = Z / ref_Z ;         //ref_Z = 108.883
+
+    if ( var_X > 0.008856 )
+        var_X = pow(var_X , ( 1/3 ));
+    else
+        var_X = ( 7.787 * var_X ) + ( 16 / 116 );
+
+    if ( var_Y > 0.008856 )
+        var_Y = pow(var_Y , ( 1/3 ));
+    else
+        var_Y = ( 7.787 * var_Y ) + ( 16 / 116 );
+
+    if ( var_Z > 0.008856 )
+        var_Z = pow(var_Z , ( 1/3 ));
+    else
+        var_Z = ( 7.787 * var_Z ) + ( 16 / 116 );
+
+//    CIE-L* = ( 116 * var_Y ) - 16
+//    CIE-a* = 500 * ( var_X - var_Y )
+//    CIE-b* = 200 * ( var_Y - var_Z )
 
 
-    lab.L=L;
-    lab.a=A;
-    lab.b=B;
+
+    lab.L=( 116 * var_Y ) - 16;
+    lab.a=500 * ( var_X - var_Y );
+    lab.b=200 * ( var_Y - var_Z );
     (*Labpixel) = lab;
 }
 
@@ -772,24 +798,55 @@ void CIEXYZ( double x, double y, double z)
 
  void RGBtoXYZ(Uint8 red, Uint8 green, Uint8 blue)
 {
+     double r,g,b;
+
     // normalize red, green, blue values
     double rLinear = (double)red/255.0;
     double gLinear = (double)green/255.0;
     double bLinear = (double)blue/255.0;
 
     // convert to a sRGB form
-    double r = (rLinear > 0.04045)? pow((rLinear + 0.055)/(1 + 0.055), 2.2) : (rLinear/12.92) ;
-    double g = (gLinear > 0.04045)? pow((gLinear + 0.055)/(1 + 0.055), 2.2) : (gLinear/12.92) ;
-    double b = (bLinear > 0.04045)? pow((bLinear + 0.055)/(1 + 0.055), 2.2) : (bLinear/12.92) ;
+//    double r = (rLinear > 0.04045)? pow((rLinear + 0.055)/(1 + 0.055), 2.2) : (rLinear/12.92) ;
+//    double g = (gLinear > 0.04045)? pow((gLinear + 0.055)/(1 + 0.055), 2.2) : (gLinear/12.92) ;
+//    double b = (bLinear > 0.04045)? pow((bLinear + 0.055)/(1 + 0.055), 2.2) : (bLinear/12.92) ;
 
-    r *=100; g *=100; b *=100;
+    if ( rLinear > 0.04045 )
+        rLinear = pow( ( rLinear + 0.055 ) / 1.055 ,2.4);
+    else
+        rLinear = rLinear / 12.92;
+
+    if ( gLinear > 0.04045 )
+        gLinear = pow( ( gLinear + 0.055 ) / 1.055  , 2.4);
+    else
+        gLinear = gLinear / 12.92;
+
+    if ( bLinear > 0.04045 )
+        bLinear = pow( ( bLinear + 0.055 ) / 1.055  , 2.4);
+    else
+        bLinear = bLinear / 12.92;
+
+
+//    rLinear *=100; gLinear *=100; bLinear *=100;
+
+
+    //Observer. = 2°, Illuminant = D65
+//    double X = rLinear * 0.4124 + gLinear * 0.3576 + bLinear * 0.1805;
+//    double Y = rLinear * 0.2126 + gLinear * 0.7152 + bLinear * 0.0722;
+//    double Z = rLinear * 0.0193 + gLinear * 0.1192 + bLinear * 0.9505;
+//    printf("%f,%f,%f\n",X,Y,Z);
 
     // converts CIE to XYZ
     CIEXYZ(
-        (r*0.4124 + g*0.3576 + b*0.1805),
-        (r*0.2126 + g*0.7152 + b*0.0722),
-        (r*0.0193 + g*0.1192 + b*0.9505)
+        (rLinear * 0.4124 + gLinear * 0.3576 + bLinear * 0.1805),
+        (rLinear * 0.2126 + gLinear * 0.7152 + bLinear * 0.0722),
+        (rLinear * 0.0193 + gLinear * 0.1192 + bLinear * 0.9505)
         );
+
+
+
+
+
+
 }
 
 
@@ -879,10 +936,10 @@ void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **converte
 
 //            printf("xyzArraySRC[%d]= %d, %d, %d, \n", tmpIndex, xyzArraySRC[tmpIndex].x ,xyzArraySRC[tmpIndex].y, xyzArraySRC[tmpIndex].z);
 
-            Uint8  X=0;
-            Uint8  Y=0;
-            Uint8  Z=0;
-            SDL_GetRGB(  (*srcpixels)[tmpIndex], formattedSurfaceSRC->format, &X, &Y, &Z);
+            double  X=xyz.x;
+            double  Y=xyz.y;
+            double  Z=xyz.z;
+//            SDL_GetRGB(  (*srcpixels)[tmpIndex], formattedSurfaceSRC->format, &X, &Y, &Z);
 
             XYZtoLab( &(xyzArraySRC[tmpIndex]), &(LabArraySRC[tmpIndex]), X,Y,Z );
         }
