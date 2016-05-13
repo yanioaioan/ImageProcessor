@@ -434,9 +434,11 @@ void sharpen(Uint32 ** pixels, float sharpenCoefficient)
 {
     //Filter matrix 3x3
     float sharpMat[3][3]={{-1,-2,-1},{-2,19,-2},{-1,-2,-1}};
+
     for (int jj=0; jj <3 ; ++jj)
         for (int ii=0; ii <3 ; ++ii)
             sharpMat[jj][ii]*=(float)1/7;
+
 
 
     for (int y = 0; y < formattedSurface->h; y++)
@@ -449,6 +451,7 @@ void sharpen(Uint32 ** pixels, float sharpenCoefficient)
                 float sumR=0;
                 float sumG=0;
                 float sumB=0;
+
 
                 for (int i = -1; i <= 1; i++)
                 {
@@ -464,9 +467,9 @@ void sharpen(Uint32 ** pixels, float sharpenCoefficient)
                         if(i==0 && j==0)
                         {
                             SDL_GetRGB((*pixels)[tmpIndex], formattedSurface->format, &red, &green, &blue);
-                            float r=(float)red*sharpenCoefficient*sharpMat[i+1][j+1];
-                            float g=(float)green*sharpenCoefficient*sharpMat[i+1][j+1];
-                            float b=(float)blue*sharpenCoefficient*sharpMat[i+1][j+1];
+                            float r=(float)red*sharpMat[i+1][j+1];
+                            float g=(float)green*sharpMat[i+1][j+1];
+                            float b=(float)blue*sharpMat[i+1][j+1];
 
                             sumR+=r;
                             sumG+=g;
@@ -757,19 +760,19 @@ void XYZtoLab(XYZ *XYZpixel, Lab *Labpixel, double X, double Y, double Z)
     double var_Z = Z / ref_Z ;         //ref_Z = 108.883
 
     if ( var_X > 0.008856 )
-        var_X = pow(var_X , ( 1/3 ));
+        var_X = pow(var_X , 0.333333);
     else
-        var_X = ( 7.787 * var_X ) + ( 16 / 116 );
+        var_X = ( 7.787 * var_X ) +0.137931;
 
     if ( var_Y > 0.008856 )
-        var_Y = pow(var_Y , ( 1/3 ));
+        var_Y = pow(var_Y , 0.333333);
     else
-        var_Y = ( 7.787 * var_Y ) + ( 16 / 116 );
+        var_Y = ( 7.787 * var_Y ) +0.137931;
 
     if ( var_Z > 0.008856 )
-        var_Z = pow(var_Z , ( 1/3 ));
+        var_Z = pow(var_Z , 0.333333);
     else
-        var_Z = ( 7.787 * var_Z ) + ( 16 / 116 );
+        var_Z = ( 7.787 * var_Z ) +0.137931;
 
 //    CIE-L* = ( 116 * var_Y ) - 16
 //    CIE-a* = 500 * ( var_X - var_Y )
@@ -777,7 +780,7 @@ void XYZtoLab(XYZ *XYZpixel, Lab *Labpixel, double X, double Y, double Z)
 
 
 
-    lab.L=( 116 * var_Y ) - 16;
+    lab.L=double( 116.0 * var_Y ) - 16.0;
     lab.a=500 * ( var_X - var_Y );
     lab.b=200 * ( var_Y - var_Z );
     (*Labpixel) = lab;
@@ -894,6 +897,9 @@ void  XYZtoRGB(Uint32 *destpixel,double x, double y, double z)
 /// </summary>
 void LabtoXYZ(double l, double a, double b)
 {
+
+//    if (l>100) l=100; if (l<0) l=0;
+
  double delta = 6.0/29.0;
 
  double fy = (l+16)/116.0;
@@ -934,7 +940,7 @@ void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **converte
             RGBtoXYZ(red, green, blue);//modify xyz
             xyzArraySRC[tmpIndex]= xyz; //assign it
 
-//            printf("xyzArraySRC[%d]= %d, %d, %d, \n", tmpIndex, xyzArraySRC[tmpIndex].x ,xyzArraySRC[tmpIndex].y, xyzArraySRC[tmpIndex].z);
+//            printf("xyzArraySRC[%d]= %f, %f, %f, \n", tmpIndex, xyzArraySRC[tmpIndex].x ,xyzArraySRC[tmpIndex].y, xyzArraySRC[tmpIndex].z);
 
             double  X=xyz.x;
             double  Y=xyz.y;
@@ -942,8 +948,13 @@ void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **converte
 //            SDL_GetRGB(  (*srcpixels)[tmpIndex], formattedSurfaceSRC->format, &X, &Y, &Z);
 
             XYZtoLab( &(xyzArraySRC[tmpIndex]), &(LabArraySRC[tmpIndex]), X,Y,Z );
+
+//            printf("LabArraySRC[%d]= %f, %f, %f, \n", tmpIndex, LabArraySRC[tmpIndex].L ,LabArraySRC[tmpIndex].a, LabArraySRC[tmpIndex].b);
         }
     }
+
+
+
 
     // Convert dest to Lab color space
     XYZ * xyzArrayDest= new XYZ[ formattedSurface->w*formattedSurface->h];
@@ -965,10 +976,10 @@ void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **converte
             RGBtoXYZ(red, green, blue);//modify xyz
             xyzArrayDest[tmpIndex]= xyz; //assign it
 
-            Uint8  X=0;
-            Uint8  Y=0;
-            Uint8  Z=0;
-            SDL_GetRGB(  (*dstpixels)[tmpIndex], formattedSurfaceSRC->format, &X, &Y, &Z);
+            double  X=xyz.x;
+            double  Y=xyz.y;
+            double  Z=xyz.z;
+//            SDL_GetRGB(  (*dstpixels)[tmpIndex], formattedSurfaceSRC->format, &X, &Y, &Z);
 
             XYZtoLab( &(xyzArrayDest[tmpIndex]), &(LabArrayDest[tmpIndex]), X,Y,Z );
         }
@@ -991,12 +1002,12 @@ void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **converte
         }
     }
 
-    double meanLsrc = totalLsrc / formattedSurface->w*formattedSurface->h;
-    double meanAsrc = totalAsrc / formattedSurface->w*formattedSurface->h;
-    double meanBsrc = totalBsrc / formattedSurface->w*formattedSurface->h;
-    double meanLdest = totalLdest / formattedSurface->w*formattedSurface->h;
-    double meanAdest = totalAdest / formattedSurface->w*formattedSurface->h;
-    double meanBdest = totalBdest / formattedSurface->w*formattedSurface->h;
+    double meanLsrc = totalLsrc / double(formattedSurface->w*formattedSurface->h);
+    double meanAsrc = totalAsrc / double(formattedSurface->w*formattedSurface->h);
+    double meanBsrc = totalBsrc / double(formattedSurface->w*formattedSurface->h);
+    double meanLdest = totalLdest / double(formattedSurface->w*formattedSurface->h);
+    double meanAdest = totalAdest / double(formattedSurface->w*formattedSurface->h);
+    double meanBdest = totalBdest / double(formattedSurface->w*formattedSurface->h);
 
     // compute standard deviation of L, a, b  of src and dest image (find variance and take sqrt of it)
 
@@ -1019,12 +1030,12 @@ void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **converte
         }
     }
 
-    double varLsrc = sumdiffLsrc / formattedSurface->w*formattedSurface->h;
-    double varAsrc = sumdiffAsrc / formattedSurface->w*formattedSurface->h;
-    double varBsrc = sumdiffBsrc / formattedSurface->w*formattedSurface->h;
-    double varLdest = sumdiffLdest / formattedSurface->w*formattedSurface->h;
-    double varAdest = sumdiffAdest / formattedSurface->w*formattedSurface->h;
-    double varBdest = sumdiffBdest / formattedSurface->w*formattedSurface->h;
+    double varLsrc = sumdiffLsrc / double(formattedSurface->w*formattedSurface->h);
+    double varAsrc = sumdiffAsrc / double(formattedSurface->w*formattedSurface->h);
+    double varBsrc = sumdiffBsrc / double(formattedSurface->w*formattedSurface->h);
+    double varLdest = sumdiffLdest / double(formattedSurface->w*formattedSurface->h);
+    double varAdest = sumdiffAdest / double(formattedSurface->w*formattedSurface->h);
+    double varBdest = sumdiffBdest / double(formattedSurface->w*formattedSurface->h);
 
     // standar deviation
     double sdevLsrc = sqrt(varLsrc);
@@ -1125,8 +1136,13 @@ void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **converte
     delete LabArrayDest;
 }
 
-
-
+//http://www.pyimagesearch.com/2014/06/30/super-fast-color-transfer-images/
+//http://www.codeproject.com/Articles/19045/Manipulating-colors-in-NET-Part#xyz
+//http://www.easyrgb.com/index.php?X=MATH&H=07#text7
+//http://www.easyrgb.com/index.php?X=CALC#Result
+//http://colormine.org/convert/rgb-to-xyz
+//http://colormine.org/convert/rgb-to-lab
+//http://colormine.org/convert/xyz-to-lab
 
 int main(int argc, char ** argv)
 {
@@ -1134,16 +1150,19 @@ int main(int argc, char ** argv)
     SDL_Init(SDL_INIT_VIDEO);
     IMG_Init(IMG_INIT_JPG);
 
-    window = SDL_CreateWindow("SDL2 Grayscale",
+    window = SDL_CreateWindow("SDL2 Photo Processor",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, 0);
     renderer = SDL_CreateRenderer(window, -1, 0);
 
     //create a surface and load an image to it
 
     //create a properly formated surface (with the right pixel format) based on the image surface created before
-    image = IMG_Load("antipaxoi.png");
+//    image = IMG_Load("antipaxoi.png");
+//    imageSRCCOLORGRADE = IMG_Load("woods_storm_src.png");
 
-    imageSRCCOLORGRADE = IMG_Load("imageSRCCOLORGRADE.png");
+        image = IMG_Load("bournemouthsea.png");
+        imageSRCCOLORGRADE = IMG_Load("imageSRCCOLORGRADE.png");
+
 
 
     if (image==NULL)
