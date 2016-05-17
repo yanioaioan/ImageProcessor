@@ -1,0 +1,33 @@
+
+//
+// LollipopShaders - RIS100
+//
+// requires Maya 2014 or 2015
+//
+
+startAttrPreset("PxrDisney");
+blendAttrStr "notes" "LollipopShaders RIS100 Preset Name:\naventurnine";
+blendAttr "baseColorR" 0.278000026941;
+blendAttr "baseColorG" 0.300000011921;
+blendAttr "baseColorB" 0.276000022888;
+blendAttr "emitColorR" 0.0;
+blendAttr "emitColorG" 0.0;
+blendAttr "emitColorB" 0.0;
+blendAttr "subsurface" 0.300000011921;
+blendAttr "subsurfaceColorR" 0.17634999752;
+blendAttr "subsurfaceColorG" 0.20000000298;
+blendAttr "subsurfaceColorB" 0.174199998379;
+blendAttr "metallic" 0.0;
+blendAttr "specular" 0.0299999993294;
+blendAttr "specularTint" 0.0;
+blendAttr "roughness" 0.15000000596;
+blendAttr "anisotropic" 0.0;
+blendAttr "sheen" 0.0;
+blendAttr "sheenTint" 0.5;
+blendAttr "clearcoat" 0.0;
+blendAttr "clearcoatGloss" 1.0;
+blendAttr "bumpNormalX" 0.0;
+blendAttr "bumpNormalY" 0.0;
+blendAttr "bumpNormalZ" 0.0;
+endAttrPreset();
+

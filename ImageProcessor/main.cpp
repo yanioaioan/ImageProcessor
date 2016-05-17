@@ -916,10 +916,18 @@ void LabtoXYZ(double l, double a, double b)
      );
 }
 
+#include <stdio.h>
 
 
 void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **convertedPixel*/)
 {
+    //create a log file with color conversions
+
+    FILE *fp;
+    fp = fopen("colorLog.txt", "w");
+
+
+
     // Convert src to Lab color space
     XYZ * xyzArraySRC= new XYZ[ formattedSurfaceSRC->w*formattedSurfaceSRC->h];
     Lab *LabArraySRC = new Lab[ formattedSurfaceSRC->w*formattedSurfaceSRC->h];
@@ -949,7 +957,22 @@ void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **converte
 
             XYZtoLab( &(xyzArraySRC[tmpIndex]), &(LabArraySRC[tmpIndex]), X,Y,Z );
 
-//            printf("LabArraySRC[%d]= %f, %f, %f, \n", tmpIndex, LabArraySRC[tmpIndex].L ,LabArraySRC[tmpIndex].a, LabArraySRC[tmpIndex].b);
+//            printf("Lab Array SRC image[%d]= %f, %f, %f, \n", tmpIndex, LabArraySRC[tmpIndex].L ,LabArraySRC[tmpIndex].a, LabArraySRC[tmpIndex].b);
+            if (y==0 && x==0)
+            {
+                char s[50];
+                sprintf(s,"srcL %f ", LabArraySRC[tmpIndex].L);
+                fprintf(fp, s);
+                sprintf(s,"srcA %f ", LabArraySRC[tmpIndex].a);
+                fprintf(fp, s);
+                sprintf(s,"srcB %f ", LabArraySRC[tmpIndex].b);
+                fprintf(fp, s);
+
+                fputs("\n", fp);
+                fclose(fp);
+            }
+
+
         }
     }
 
@@ -982,6 +1005,23 @@ void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **converte
 //            SDL_GetRGB(  (*dstpixels)[tmpIndex], formattedSurfaceSRC->format, &X, &Y, &Z);
 
             XYZtoLab( &(xyzArrayDest[tmpIndex]), &(LabArrayDest[tmpIndex]), X,Y,Z );
+
+            if (y==0 && x==0)
+            {
+                fp = fopen("colorLog.txt", "a");
+
+                char s[50];
+                sprintf(s,"destL %f ", LabArrayDest[tmpIndex].L);
+                fprintf(fp, s);
+                sprintf(s,"destA %f ", LabArrayDest[tmpIndex].a);
+                fprintf(fp, s);
+                sprintf(s,"destB %f ", LabArrayDest[tmpIndex].b);
+                fprintf(fp, s);
+
+                fputs("\n", fp);
+                fclose(fp);
+            }
+
         }
     }
 
@@ -1083,6 +1123,69 @@ void colortransfer(Uint32 **srcpixels, Uint32 **dstpixels  /*, Uint32 **converte
             LabtoXYZ(LabArrayDest[i].L, LabArrayDest[i].a, LabArrayDest[i].b);
 
             XYZtoRGB( &(*dstpixels)[i] ,xyz.x, xyz.y, xyz.z);
+
+
+
+
+            if (y==0 && x==0)
+            {
+                fp = fopen("colorLog.txt", "a");
+
+                char s[50];
+                sprintf(s,"stdev applied : LabArrayDest L %f ",LabArrayDest[i].L);
+                fprintf(fp, s);
+                sprintf(s,"stdev applied : LabArrayDest A %f ", LabArrayDest[i].a);
+                fprintf(fp, s);
+                sprintf(s,"stdev applied : LabArrayDest B %f ", LabArrayDest[i].b);
+                fprintf(fp, s);
+
+                fputs("\n", fp);
+                fclose(fp);
+            }
+
+
+
+
+            if (y==0 && x==0)
+            {
+                fp = fopen("colorLog.txt", "a");
+
+                char s[50];
+                sprintf(s,"end x %f ",xyz.x);
+                fprintf(fp, s);
+                sprintf(s,"end y %f ", xyz.y);
+                fprintf(fp, s);
+                sprintf(s,"end z %f ", xyz.z);
+                fprintf(fp, s);
+
+                fputs("\n", fp);
+                fclose(fp);
+            }
+
+
+            if (y==0 && x==0)
+            {
+                fp = fopen("colorLog.txt", "a");
+
+                Uint8  red=0;
+                Uint8  green=0;
+                Uint8  blue=0;
+
+                SDL_GetRGB( (*dstpixels)[i], formattedSurfaceSRC->format, &red, &green, &blue);
+
+                char s[50];
+                sprintf(s,"end R %d ", red);
+                fprintf(fp, s);
+                sprintf(s,"end G %d ", green);
+                fprintf(fp, s);
+                sprintf(s,"end B %d ", blue);
+                fprintf(fp, s);
+
+                fputs("\n", fp);
+                fclose(fp);
+            }
+
+
 
 //            SDL_UpdateTexture(texture, NULL, backbufferpixels, 640 * sizeof(Uint32));
 //            SDL_RenderCopy(renderer, texture, NULL, NULL);
